@@ -30,7 +30,7 @@ class App {
                 'message',
                 'Everybody, say hello to ' + socket.id
             )
-            
+
             this.io.emit('hello', "wold");
 
 

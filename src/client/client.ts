@@ -10,6 +10,11 @@ class Client {
         this.socket.on('message', function (message: any) {
             document.body.innerHTML += 'Message du serveur ' + message + '<br/>'
         })
+
+        this.socket.on('hello', function (message: any){
+            console.log(message);
+            document.body.innerHTML += 'General ' + message + '<br/>'
+        })
         
     }
 }

@@ -19,6 +19,7 @@ class App {
             console.log('a user connected : ' + socket.id);
             socket.emit('message', 'Hello ' + socket.id);
             socket.broadcast.emit('message', 'Everybody, say hello to ' + socket.id);
+            this.io.emit('hello', "wold");
             socket.on('disconnect', function () {
                 console.log('socket disconnected : ' + socket.id);
             });

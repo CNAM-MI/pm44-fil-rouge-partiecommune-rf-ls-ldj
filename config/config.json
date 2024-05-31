@@ -1,0 +1,24 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "bdmpwd",
+    "database": "bdmDB",
+    "host": "84.235.235.229",
+    "port": 5432,
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "bdmpwd",
+    "database": "bdmDB",
+    "host": "84.235.235.229:5432",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "bdmpwd",
+    "database": "bdmDB",
+    "host": "84.235.235.229:5432",
+    "dialect": "postgres"
+  }
+}

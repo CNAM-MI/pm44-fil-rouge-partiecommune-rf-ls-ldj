@@ -3,19 +3,15 @@ class Client {
 
     constructor() {
         this.socket = io()
-        this.socket.on('connection',  () => {
-            document.body.innerHTML += 'Id de la socket client' + this.socket.id + '<br/>'
-            this.socket.emit('message', 'Hello from client');
-        })
-        this.socket.on('message', function (message: any) {
-            document.body.innerHTML += 'Message du serveur ' + message + '<br/>'
+
+        this.socket.on('connect', function () {
+            console.log('connect')
         })
 
-        this.socket.on('hello', function (message: any){
-            console.log(message);
-            document.body.innerHTML += 'General ' + message + '<br/>'
+        this.socket.on('disconnect', function (message: any) {
+            console.log('disconnect ' + message)
+            location.reload()
         })
-        
     }
 }
 

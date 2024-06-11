@@ -2,36 +2,18 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Sondage3s', {
+    await queryInterface.createTable('Votes', {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      idSondage: {
+      day: {
         type: Sequelize.INTEGER
       },
-      idUser: {
+      hour: {
         type: Sequelize.INTEGER
-      },
-      dateCreation: {
-        type: Sequelize.DATE
-      },
-      dateExpiration: {
-        type: Sequelize.DATE
-      },
-      dayVoteTime: {
-        type: Sequelize.INTEGER
-      },
-      hourVoteTime: {
-        type: Sequelize.INTEGER
-      },
-      associatedPicture: {
-        type: Sequelize.BLOB
-      },
-      backgroundColor: {
-        type: Sequelize.STRING
       },
       createdAt: {
         allowNull: false,
@@ -40,10 +22,24 @@ module.exports = {
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE
-      }
+      },
+      idUser: {
+        type: Sequelize.INTEGER,
+        references: {
+          model: 'User', // nom du modèle référencé
+          key: 'id' // nom de la colonne référencée
+        },
+      },
+      idSondage: {
+        type: Sequelize.INTEGER,
+        references: {
+          model: 'Sondage', // nom du modèle référencé
+          key: 'id' // nom de la colonne référencée
+        },
+      },
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Sondage3s');
+    await queryInterface.dropTable('Votes');
   }
 };

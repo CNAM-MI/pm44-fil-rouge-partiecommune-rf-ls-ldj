@@ -35,16 +35,43 @@ const index_1 = __importDefault(require("../../models/index"));
 const port = 3000;
 class App {
     constructor(port) {
+        this.sequelizes = new seq.Sequelize({
+            host: '84.235.235.229',
+            dialect: 'postgres',
+            port: 5432,
+            database: 'bdmDB',
+            username: 'postgres',
+            password: 'bdmpwd',
+        });
         this.port = port;
+        this.sequelizes.authenticate();
+        const user = index_1.default['User'].build({ id: 2, pseudo: 'DarkJesus', age: 2 });
+        user.save();
         const app = (0, express_1.default)();
         app.use(express_1.default.static(path_1.default.join(__dirname, '../client')));
         this.server = new http_1.default.Server(app);
-        this.io = new socket_io_1.default.Server(this.server);
+        this.io = new socket_io_1.default.Server(this.server, {
+            cors: {
+                origin: "http://localhost:8100"
+            }
+        });
         this.io.on('connection', (socket) => {
             console.log('a user connected : ' + socket.id);
             socket.emit('message', 'Hello ' + socket.id);
             socket.broadcast.emit('message', 'Everybody, say coucou to ' + socket.id);
             this.io.emit('hello', "wold");
+            socket.on('talktome', (data) => {
+                console.log('Message reçu du client :', data.message);
+                try {
+                    index_1.default['Logan'].findAll().then((e) => {
+                        console.log("test", e);
+                        this.io.emit("hi", e);
+                    });
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
             socket.on('disconnect', function () {
                 console.log('socket disconnected : ' + socket.id);
             });
@@ -53,50 +80,30 @@ class App {
     Start() {
         this.server.listen(this.port);
         console.log(`Server listening on port ${this.port}.`);
+        console.log(`Socket.IO version: ${this.io}`);
     }
 }
-//new App(port).Start();
-const sequelizes = new seq.Sequelize({
-    host: '84.235.235.229',
-    dialect: 'postgres',
-    port: 5432,
-    database: 'bdmDB',
-    username: 'postgres',
-    password: 'bdmpwd',
-});
-try {
-    sequelizes.authenticate();
-    console.log('Connection has been established successfully.');
-    // Obtenir une instance de QueryInterface
-    const queryInterface = sequelizes.getQueryInterface();
-    queryInterface.showAllTables()
-        .then(tableNames => {
+new App(port).Start();
+// Obtenir une instance de QueryInterface
+/**const queryInterface = sequelizes.getQueryInterface();
+
+queryInterface.showAllTables()
+    .then(tableNames => {
         // Afficher la liste des tables
         console.log('Tables:', tableNames);
     });
-    // Create a new user
-    //const jane =  Utilisateur.build({ pseudo: 'Jane', mot_de_passe: 'osekour', photo_profil: null});
-    //console.log("Jane's auto-generated ID:", jane.id);
-    const user = index_1.default['Utilisateur'].build({ pseudoe: 'Jane', mot_de_passe: 'osekour', photo_profil: null });
-    user.save();
-    const sondage = index_1.default['Sondage'].build({ pseudoe: 'Bonsoir', mot_de_passe: 'ouioui', photo_profil: null });
-    sondage.save().then((e) => { console.log(e); });
-    /**db['Utilisateur'].findAll().then((e) => {
-        console.log("test", e);
-    })**/
-    index_1.default['Sondage'].findAll().then((e) => {
-        console.log("test", e);
-    });
-    // Enregistrer la nouvelle instance dans la base de données
-    /**Utilisateur.create(nouveauUtilisateur)
-        .then(utilisateur => {
-            console.log("utilisateur créée", utilisateur);
-        })
-        .catch(err => {
-            console.error('Erreur lors de la création de l\'utilisateur :', err);
-        });**/
-}
-catch (error) {
-    console.error('Unable to connect to the database:', error);
-}
+ */
+/**const sondage = db['Sondage'].build({ pseudoe: 'Bonsoir', mot_de_passe: 'ouioui', photo_profil: null});
+sondage.save().then((e) => {console.log(e)});**/
+/**db['Utilisateur'].findAll().then((e) => {
+    console.log("test", e);
+})**/
+// Enregistrer la nouvelle instance dans la base de données
+/**Utilisateur.create(nouveauUtilisateur)
+    .then(utilisateur => {
+        console.log("utilisateur créée", utilisateur);
+    })
+    .catch(err => {
+        console.error('Erreur lors de la création de l\'utilisateur :', err);
+    });**/
 //# sourceMappingURL=server.js.map

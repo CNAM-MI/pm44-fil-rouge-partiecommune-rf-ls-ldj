@@ -2,21 +2,30 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Sondages', {
+    await queryInterface.createTable('Bonsoir', {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      pseudo: {
-        type: Sequelize.STRING
+      date_creation: {
+        type: Sequelize.DATE
       },
-      mot_de_passe: {
-        type: Sequelize.STRING
+      date_expiration: {
+        type: Sequelize.DATE
       },
-      photo_profil: {
+      day_votetime: {
+        type: Sequelize.INTEGER
+      },
+      hour_votetime: {
+        type: Sequelize.INTEGER
+      },
+      associated_picture: {
         type: Sequelize.BLOB
+      },
+      backgroundcolor: {
+        type: Sequelize.STRING
       },
       createdAt: {
         allowNull: false,
@@ -25,10 +34,12 @@ module.exports = {
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE
-      }
+      },
+    }).then(() => {
+
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Sondages');
+    await queryInterface.dropTable('Bonsoir');
   }
 };

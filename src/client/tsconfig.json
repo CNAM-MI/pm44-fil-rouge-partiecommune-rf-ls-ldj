@@ -6,6 +6,7 @@
         "baseUrl": ".",
         "paths": {},
         "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
         "strict": true
     },
     "include": ["**/*.ts"]

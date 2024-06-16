@@ -32,7 +32,17 @@ const http_1 = __importDefault(require("http"));
 const socket_io_1 = __importDefault(require("socket.io"));
 const seq = __importStar(require("sequelize"));
 const index_1 = __importDefault(require("../../models/index"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const sequelize_1 = require("sequelize");
 const port = 3000;
+;
+;
+;
+;
+;
+;
+;
+;
 class App {
     constructor(port) {
         this.sequelizes = new seq.Sequelize({
@@ -45,8 +55,6 @@ class App {
         });
         this.port = port;
         this.sequelizes.authenticate();
-        const user = index_1.default['User'].build({ id: 2, pseudo: 'DarkJesus', age: 2 });
-        user.save();
         const app = (0, express_1.default)();
         app.use(express_1.default.static(path_1.default.join(__dirname, '../client')));
         this.server = new http_1.default.Server(app);
@@ -56,17 +64,97 @@ class App {
             }
         });
         this.io.on('connection', (socket) => {
+            // Log whenever a user connects
             console.log('a user connected : ' + socket.id);
-            socket.emit('message', 'Hello ' + socket.id);
-            socket.broadcast.emit('message', 'Everybody, say coucou to ' + socket.id);
-            this.io.emit('hello', "wold");
-            socket.on('talktome', (data) => {
+            // Log whenever a client send a "talktome" event
+            socket.on('talktome', async (data) => {
                 console.log('Message reçu du client :', data.message);
                 try {
-                    index_1.default['Logan'].findAll().then((e) => {
-                        console.log("test", e);
-                        this.io.emit("hi", e);
+                    // Answer to client for testing good reception and connection
+                    this.io.emit("hi", "coucou wesh");
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
+            socket.on('createSondageAction', async (data) => {
+                try {
+                    const existingRow = await index_1.default['Sondage'].findOne({
+                        where: {
+                            myField: {
+                                [sequelize_1.Op.or]: [
+                                    { [sequelize_1.Op.ne]: null }, // Vérifie si le champ n'est pas null
+                                    { [sequelize_1.Op.lte]: new Date() } // Vérifie si le champ est inférieur ou égal à la date actuelle
+                                ]
+                            }
+                        }
                     });
+                    if (existingRow) {
+                        let createdSondage = await index_1.default['Sondage'].create({
+                            id_user: data.id_user,
+                            date_creation: data.date_creation,
+                            day_vote_time: data.day_vote_time,
+                            hour_vote_time: data.hour_vote_time,
+                            associated_picture: data.associated_picture,
+                            background_color: data.background_color,
+                        });
+                        //this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time);
+                    }
+                    else
+                        return;
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
+            socket.on('getSondagesAction', async () => {
+                try {
+                    const sondagesWithUserInfo = await index_1.default.sequelize.query(`SELECT "Sondages".*, "Users".id AS user_id, "Users".pseudo, "Users".profile_picture
+                        FROM "Sondages"
+                        INNER JOIN "Users" ON "Sondages".id_user = "Users".id`, { type: seq.QueryTypes.SELECT });
+                    this.io.emit("getSondagesAnswer", sondagesWithUserInfo);
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
+            socket.on('createVoteAction', async (data) => {
+                try {
+                    await index_1.default['Vote'].create({
+                        id_user: data.id_user,
+                        id_sondage: data.id_sondage,
+                        day: data.day,
+                        hour: data.hour,
+                    });
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
+            socket.on('createUserAction', async (data) => {
+                try {
+                    const salt = await this.generateSalt();
+                    const hashedPassword = await this.hashPassword(data.password, salt);
+                    let createdUser = await index_1.default['User'].create({
+                        pseudo: data.pseudo,
+                        password_hash: hashedPassword,
+                        profile_picture: data.profilepicture,
+                    });
+                    console.log(createdUser.dataValues.id);
+                }
+                catch (error) {
+                    console.error('Unable to connect to the database:', error);
+                }
+            });
+            socket.on('checkValidUserAction', async (data) => {
+                try {
+                    const isValidUser = await this.authenticateUser(data.pseudo, data.password);
+                    if (isValidUser) {
+                        this.io.emit("validUserAnswer", true);
+                    }
+                    else {
+                        this.io.emit("validUserAnswer", false);
+                    }
                 }
                 catch (error) {
                     console.error('Unable to connect to the database:', error);
@@ -82,28 +170,57 @@ class App {
         console.log(`Server listening on port ${this.port}.`);
         console.log(`Socket.IO version: ${this.io}`);
     }
+    async generateSalt() {
+        return await bcryptjs_1.default.genSalt(10);
+    }
+    async hashPassword(password, salt) {
+        return await bcryptjs_1.default.hash(password, salt);
+    }
+    validatePassword(password, passwordHash) {
+        return bcryptjs_1.default.compare(password, passwordHash);
+    }
+    async authenticateUser(pseudoInput, password) {
+        const user = await index_1.default['User'].findOne({ where: { pseudo: pseudoInput } });
+        if (user === null || !(await this.validatePassword(password, user.password_hash))) {
+            return false;
+        }
+        return true;
+    }
+    createDateFromDayAndTime(day, time) {
+        const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+        const today = new Date();
+        const dayIndex = days.indexOf(day.toLowerCase());
+        const dayDiff = dayIndex >= today.getDay() ? dayIndex - today.getDay() : 7 - (today.getDay() - dayIndex);
+        const newDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + dayDiff);
+        const separateMinuteHour = time.split(":").map((a) => parseInt(a));
+        newDate.setHours(separateMinuteHour[0], separateMinuteHour[1]);
+        return newDate.getTime() > today.getTime() ? newDate : null;
+    }
+    updateDateExpirationSondage(idCreatedSondage, dateCreationSondage, dayVoteTime, hourVoteTime) {
+        let timeOut = new Date(dateCreationSondage);
+        timeOut.setMinutes(timeOut.getMinutes() + dayVoteTime + hourVoteTime);
+        setInterval(async () => {
+            if (new Date() >= timeOut) {
+                const allVotesOfSondage = await index_1.default['Vote'].findAll({
+                    where: { id_sondage: idCreatedSondage },
+                    attributes: [
+                        'day',
+                        'hour',
+                        [(0, sequelize_1.fn)('COUNT', (0, sequelize_1.col)('*')), 'count']
+                    ],
+                    //expected example, day == 'lundi' and hour == '12:00'
+                    group: ['day', 'hour'],
+                    order: [['count', 'DESC']],
+                    limit: 1
+                });
+                await index_1.default['User'].update({ date_expiration: this.createDateFromDayAndTime(allVotesOfSondage.day, allVotesOfSondage.hour) }, {
+                    where: {
+                        id: idCreatedSondage,
+                    },
+                });
+            }
+        }, 1);
+    }
 }
 new App(port).Start();
-// Obtenir une instance de QueryInterface
-/**const queryInterface = sequelizes.getQueryInterface();
-
-queryInterface.showAllTables()
-    .then(tableNames => {
-        // Afficher la liste des tables
-        console.log('Tables:', tableNames);
-    });
- */
-/**const sondage = db['Sondage'].build({ pseudoe: 'Bonsoir', mot_de_passe: 'ouioui', photo_profil: null});
-sondage.save().then((e) => {console.log(e)});**/
-/**db['Utilisateur'].findAll().then((e) => {
-    console.log("test", e);
-})**/
-// Enregistrer la nouvelle instance dans la base de données
-/**Utilisateur.create(nouveauUtilisateur)
-    .then(utilisateur => {
-        console.log("utilisateur créée", utilisateur);
-    })
-    .catch(err => {
-        console.error('Erreur lors de la création de l\'utilisateur :', err);
-    });**/
 //# sourceMappingURL=server.js.map

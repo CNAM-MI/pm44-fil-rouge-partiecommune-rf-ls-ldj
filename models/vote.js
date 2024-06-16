@@ -14,22 +14,10 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Vote.init({
-    day: DataTypes.INTEGER,
-    hour: DataTypes.INTEGER,
-    idUser: {
-      type: DataTypes.INTEGER,
-      references: {
-        model: 'User', // nom du modèle référencé
-        key: 'id' // nom de la colonne référencée
-      }
-    },
-    idSondage: {
-      type: DataTypes.INTEGER,
-      references: {
-        model: 'Sondage', // nom du modèle référencé
-        key: 'id' // nom de la colonne référencée
-      }
-    },
+    id_sondage: DataTypes.INTEGER,
+    id_user: DataTypes.INTEGER,
+    day: DataTypes.STRING,
+    hour: DataTypes.STRING
   }, {
     sequelize,
     modelName: 'Vote',

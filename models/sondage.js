@@ -19,6 +19,8 @@ module.exports = (sequelize, DataTypes) => {
     date_expiration: DataTypes.DATE,
     day_vote_time: DataTypes.INTEGER,
     hour_vote_time: DataTypes.INTEGER,
+    title: DataTypes.STRING,
+    description: DataTypes.STRING,
     associated_picture: DataTypes.BLOB,
     background_color: DataTypes.STRING
   }, {

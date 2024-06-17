@@ -27,15 +27,12 @@ interface getUserAction {
 interface createSondageAction {
     id_user: number,
     date_creation: Date,
-    day_vote_time: string,
+    day_vote_time: number,
     hour_vote_time: number,
+    title: string,
+    description: string,
     associated_picture: Blob,
     background_color: string,
-};
-
-interface getCurrentSondageAction {
-    table: string,
-    action: string,
 };
 
 interface createVoteAction {
@@ -95,10 +92,11 @@ class App {
 
             socket.on('createSondageAction', async (data: createSondageAction) => {
                 try {
-                    const existingRow = await db['Sondage'].findOne({
+                    // Check if a sondage is already voted
+                    const canCreateSondage = await db['Sondage'].findOne({
                         where: {
-                            myField: {
-                                [Op.or]: [
+                            date_expiration: {
+                                [Op.and]: [
                                     { [Op.ne]: null }, // Vérifie si le champ n'est pas null
                                     { [Op.lte]: new Date() } // Vérifie si le champ est inférieur ou égal à la date actuelle
                                 ]
@@ -106,18 +104,27 @@ class App {
                         }
                     });
 
-                    if (existingRow) {
+                    const noDataInSondage = !await db['Sondage'].findOne();
+
+                    if (canCreateSondage || noDataInSondage) {
                         let createdSondage = await db['Sondage'].create({
                             id_user: data.id_user,
                             date_creation: data.date_creation,
                             day_vote_time: data.day_vote_time,
                             hour_vote_time: data.hour_vote_time,
+                            title: data.title,
+                            description: data.description,
                             associated_picture: data.associated_picture,
                             background_color: data.background_color,
                         });
-                        //this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time);
+                        //TODO: fix les types de date, voir en decommantant la ligne suivante
+                        await this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time);
+                        this.io.emit("canCreateSondageAnswer", true);
                     }
-                    else return;
+                    else {
+                        this.io.emit("canCreateSondageAnswer", false);
+                        return;
+                    }
 
                 } catch (error) {
                     console.error('Unable to connect to the database:', error);
@@ -127,7 +134,7 @@ class App {
             socket.on('getSondagesAction', async () => {
                 try {
                     const sondagesWithUserInfo = await db.sequelize.query(
-                        `SELECT "Sondages".*, "Users".id AS user_id, "Users".pseudo, "Users".profile_picture
+                        `SELECT "Sondages".*, "Users".pseudo, "Users".profile_picture
                         FROM "Sondages"
                         INNER JOIN "Users" ON "Sondages".id_user = "Users".id`,
                         { type: seq.QueryTypes.SELECT }
@@ -160,7 +167,6 @@ class App {
                         password_hash: hashedPassword,
                         profile_picture: data.profilepicture,
                     });
-                    console.log(createdUser.dataValues.id);
                 } catch (error) {
                     console.error('Unable to connect to the database:', error);
                 }
@@ -222,7 +228,7 @@ class App {
         return newDate.getTime() > today.getTime() ? newDate : null;
     }
 
-    public updateDateExpirationSondage(idCreatedSondage: number, dateCreationSondage: Date, dayVoteTime: number, hourVoteTime: number) {
+    public async updateDateExpirationSondage(idCreatedSondage: number, dateCreationSondage: Date, dayVoteTime: number, hourVoteTime: number) {
         let timeOut = new Date(dateCreationSondage);
         timeOut.setMinutes(timeOut.getMinutes() + dayVoteTime + hourVoteTime);
         setInterval(async () => {

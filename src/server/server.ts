@@ -92,18 +92,20 @@ class App {
 
             socket.on('createSondageAction', async (data: createSondageAction) => {
                 try {
-                    // Check if a sondage is already voted
-                    const canCreateSondage = await db['Sondage'].findOne({
+                    const allSondagesCount = await db['Sondage'].count();
+                    // Count every finished sondages
+                    const alreadyVotedSondageCount = await db['Sondage'].findAll({
                         where: {
                             date_expiration: {
                                 [Op.and]: [
-                                    { [Op.ne]: null }, // Vérifie si le champ n'est pas null
-                                    { [Op.lte]: new Date() } // Vérifie si le champ est inférieur ou égal à la date actuelle
+                                    { [Op.ne]: null }, 
+                                    { [Op.lte]: new Date() } 
                                 ]
-                            }
+                            },
                         }
                     });
-
+                    //Check if all sondages are already finished
+                    const canCreateSondage = allSondagesCount === alreadyVotedSondageCount.length ?? false;
                     const noDataInSondage = !await db['Sondage'].findOne();
 
                     if (canCreateSondage || noDataInSondage) {
@@ -118,7 +120,7 @@ class App {
                             background_color: data.background_color,
                         });
                         //TODO: fix les types de date, voir en decommantant la ligne suivante
-                        await this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time);
+                        await this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time, data.title);
                         this.io.emit("canCreateSondageAnswer", true);
                     }
                     else {
@@ -228,10 +230,10 @@ class App {
         return newDate.getTime() > today.getTime() ? newDate : null;
     }
 
-    public async updateDateExpirationSondage(idCreatedSondage: number, dateCreationSondage: Date, dayVoteTime: number, hourVoteTime: number) {
+    public async updateDateExpirationSondage(idCreatedSondage: number, dateCreationSondage: Date, dayVoteTime: number, hourVoteTime: number, sondateTitle: string) {
         let timeOut = new Date(dateCreationSondage);
         timeOut.setMinutes(timeOut.getMinutes() + dayVoteTime + hourVoteTime);
-        setInterval(async () => {
+        let refreshIntervalId = setInterval(async () => {
             if (new Date() >= timeOut) {
                 const allVotesOfSondage = await db['Vote'].findAll({
                     where: { id_sondage: idCreatedSondage },
@@ -245,15 +247,32 @@ class App {
                     order: [['count', 'DESC']],
                     limit: 1
                 });
-
-                await db['User'].update(
-                    { date_expiration: this.createDateFromDayAndTime(allVotesOfSondage.day, allVotesOfSondage.hour) },
-                    {
-                        where: {
-                            id: idCreatedSondage,
+            
+                if (allVotesOfSondage.length > 0) {
+                    await db['Sondage'].update(
+                        { date_expiration: this.createDateFromDayAndTime(allVotesOfSondage[0].dataValues.day, allVotesOfSondage[0].dataValues.hour) },
+                        {
+                            where: {
+                                id: idCreatedSondage,
+                            },
                         },
-                    },
-                );
+                    );
+                    clearInterval(refreshIntervalId);
+                    return;
+                }
+                else {
+                    await db['Sondage'].update(
+                        { date_expiration: new Date()},
+                        {
+                            where: {
+                                id: idCreatedSondage,
+                            },
+                        },
+                    );
+                    this.io.emit('noVotesAnswer', "Aucun vote sur le sondage " + sondateTitle + " numéro " + idCreatedSondage  + ". Sondage terminé");
+                    clearInterval(refreshIntervalId);
+                    return;
+                }
             }
         }, 1);
     }

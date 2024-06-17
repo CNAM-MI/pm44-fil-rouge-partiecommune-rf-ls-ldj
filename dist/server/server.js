@@ -39,9 +39,6 @@ const port = 3000;
 ;
 ;
 ;
-;
-;
-;
 class App {
     constructor(port) {
         this.sequelizes = new seq.Sequelize({
@@ -65,7 +62,7 @@ class App {
         this.io.on('connection', (socket) => {
             // Log whenever a user connects
             console.log('a user connected : ' + socket.id);
-            // Log whenever a client send a "talktome" event
+            // Log whenever a client send a "talktome" event, for testing good reception and connection
             socket.on('talktome', async (data) => {
                 console.log('Message reçu du client :', data.message);
                 try {
@@ -105,7 +102,6 @@ class App {
                             associated_picture: data.associated_picture,
                             background_color: data.background_color,
                         });
-                        //TODO: fix les types de date, voir en decommantant la ligne suivante
                         await this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time, data.title);
                         this.io.emit("canCreateSondageAnswer", true);
                     }
@@ -146,24 +142,34 @@ class App {
                 try {
                     const salt = await this.generateSalt();
                     const hashedPassword = await this.hashPassword(data.password, salt);
-                    let createdUser = await index_1.default['User'].create({
+                    const allUserPseudo = await index_1.default['User'].findAll({
+                        attributes: ['pseudo']
+                    });
+                    const userPseudosArray = allUserPseudo.map(user => user.dataValues.pseudo);
+                    if (userPseudosArray.includes(data.pseudo)) {
+                        this.io.emit("createUserAnswer", false);
+                        return;
+                    }
+                    await index_1.default['User'].create({
                         pseudo: data.pseudo,
                         password_hash: hashedPassword,
                         profile_picture: data.profilepicture,
                     });
+                    this.io.emit("createUserAnswer", true);
                 }
                 catch (error) {
+                    this.io.emit("createUserAnswer", false);
                     console.error('Unable to connect to the database:', error);
                 }
             });
             socket.on('checkValidUserAction', async (data) => {
                 try {
-                    const isValidUser = await this.authenticateUser(data.pseudo, data.password);
-                    if (isValidUser) {
-                        this.io.emit("validUserAnswer", true);
+                    const isValidUserInfos = await this.authenticateUser(data.pseudo, data.password);
+                    if (isValidUserInfos['isValidLogin']) {
+                        this.io.emit("validUserAnswer", { isValidLogin: true, userId: isValidUserInfos['userId'] });
                     }
                     else {
-                        this.io.emit("validUserAnswer", false);
+                        this.io.emit("validUserAnswer", { isValidLogin: false, userId: isValidUserInfos['userId'] });
                     }
                 }
                 catch (error) {
@@ -192,9 +198,9 @@ class App {
     async authenticateUser(pseudoInput, password) {
         const user = await index_1.default['User'].findOne({ where: { pseudo: pseudoInput } });
         if (user === null || !(await this.validatePassword(password, user.password_hash))) {
-            return false;
+            return { isValidLogin: false };
         }
-        return true;
+        return { isValidLogin: true, userId: user.dataValues.id };
     }
     createDateFromDayAndTime(day, time) {
         const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];

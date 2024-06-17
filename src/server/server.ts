@@ -20,10 +20,6 @@ interface checkValidUserAction {
     password: string,
 };
 
-interface getUserAction {
-    id: number,
-};
-
 interface createSondageAction {
     id_user: number,
     date_creation: Date,
@@ -42,13 +38,6 @@ interface createVoteAction {
     hour: string,
 };
 
-interface getVotesHourSondage {
-    id_sondage: number,
-};
-
-interface getVotesDaySondage {
-    id_sondage: number,
-};
 class App {
     private server: http.Server
     private port: number
@@ -79,7 +68,7 @@ class App {
         this.io.on('connection', (socket: socketIO.Socket) => {
             // Log whenever a user connects
             console.log('a user connected : ' + socket.id);
-            // Log whenever a client send a "talktome" event
+            // Log whenever a client send a "talktome" event, for testing good reception and connection
             socket.on('talktome', async (data: { message: string }) => {
                 console.log('Message reçu du client :', data.message);
                 try {
@@ -107,7 +96,6 @@ class App {
                     //Check if all sondages are already finished
                     const canCreateSondage = allSondagesCount === alreadyVotedSondageCount.length ?? false;
                     const noDataInSondage = !await db['Sondage'].findOne();
-
                     if (canCreateSondage || noDataInSondage) {
                         let createdSondage = await db['Sondage'].create({
                             id_user: data.id_user,
@@ -119,7 +107,6 @@ class App {
                             associated_picture: data.associated_picture,
                             background_color: data.background_color,
                         });
-                        //TODO: fix les types de date, voir en decommantant la ligne suivante
                         await this.updateDateExpirationSondage(createdSondage.dataValues.id, data.date_creation, data.day_vote_time, data.hour_vote_time, data.title);
                         this.io.emit("canCreateSondageAnswer", true);
                     }
@@ -164,23 +151,33 @@ class App {
                 try {
                     const salt = await this.generateSalt();
                     const hashedPassword = await this.hashPassword(data.password, salt);
-                    let createdUser = await db['User'].create({
+                    const allUserPseudo = await db['User'].findAll({
+                        attributes: ['pseudo']
+                    });
+                    const userPseudosArray = allUserPseudo.map(user => user.dataValues.pseudo);
+                    if (userPseudosArray.includes(data.pseudo)) {
+                        this.io.emit("createUserAnswer", false);
+                        return;
+                    }
+                    await db['User'].create({
                         pseudo: data.pseudo,
                         password_hash: hashedPassword,
                         profile_picture: data.profilepicture,
                     });
+                    this.io.emit("createUserAnswer", true);
                 } catch (error) {
+                    this.io.emit("createUserAnswer", false);
                     console.error('Unable to connect to the database:', error);
                 }
             });
 
             socket.on('checkValidUserAction', async (data: checkValidUserAction) => {
                 try {
-                    const isValidUser = await this.authenticateUser(data.pseudo, data.password);
-                    if (isValidUser) {
-                        this.io.emit("validUserAnswer", true);
+                    const isValidUserInfos = await this.authenticateUser(data.pseudo, data.password);
+                    if (isValidUserInfos['isValidLogin']) {
+                        this.io.emit("validUserAnswer", { isValidLogin: true, userId: isValidUserInfos['userId'] });
                     } else {
-                        this.io.emit("validUserAnswer", false);
+                        this.io.emit("validUserAnswer", { isValidLogin: false, userId: isValidUserInfos['userId'] });
                     }
                 } catch (error) {
                     console.error('Unable to connect to the database:', error);
@@ -211,12 +208,12 @@ class App {
         return bcrypt.compare(password, passwordHash);
     }
 
-    public async authenticateUser(pseudoInput: string, password: string): Promise<boolean> {
+    public async authenticateUser(pseudoInput: string, password: string): Promise<Object> {
         const user = await db['User'].findOne({ where: { pseudo: pseudoInput } });
         if (user === null || !(await this.validatePassword(password, user.password_hash))) {
-            return false;
+            return {isValidLogin: false};
         }
-        return true;
+        return {isValidLogin: true, userId: user.dataValues.id};
     }
 
     public createDateFromDayAndTime(day: string, time: string): Date | null {
